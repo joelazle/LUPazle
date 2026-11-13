@@ -31,6 +31,12 @@ internal sealed class Config
     /// <summary>Atajo global para bajar el nivel de zoom.</summary>
     public string AtajoBajarZoom { get; set; } = "Ctrl+Alt+Down";
 
+    /// <summary>Atajo global para activar o desactivar la lupa (vacío = sin atajo).</summary>
+    public string AtajoActivar { get; set; } = "";
+
+    /// <summary>Atajo global para pasar al siguiente filtro de color (vacío = sin atajo).</summary>
+    public string AtajoSiguienteFiltro { get; set; } = "";
+
     /// <summary>Indica si el programa se inicia con Windows.</summary>
     public bool IniciarConWindows { get; set; }
 
@@ -63,15 +69,32 @@ internal sealed class Config
             BotonZoom = "F9";
         }
 
-        if (!Atajo.TryParse(AtajoSubirZoom, out _))
+        // Un texto vacío deshabilita el atajo; uno inválido vuelve al valor por
+        // defecto en los atajos principales y queda deshabilitado en los opcionales.
+        AtajoSubirZoom = NormalizarAtajo(AtajoSubirZoom, "Ctrl+Alt+Up");
+        AtajoBajarZoom = NormalizarAtajo(AtajoBajarZoom, "Ctrl+Alt+Down");
+        AtajoActivar = NormalizarAtajoOpcional(AtajoActivar);
+        AtajoSiguienteFiltro = NormalizarAtajoOpcional(AtajoSiguienteFiltro);
+    }
+
+    private static string NormalizarAtajo(string? texto, string porDefecto)
+    {
+        if (string.IsNullOrWhiteSpace(texto))
         {
-            AtajoSubirZoom = "Ctrl+Alt+Up";
+            return "";
         }
 
-        if (!Atajo.TryParse(AtajoBajarZoom, out _))
+        return Atajo.TryParse(texto, out Atajo atajo) ? atajo.HaciaTexto() : porDefecto;
+    }
+
+    private static string NormalizarAtajoOpcional(string? texto)
+    {
+        if (string.IsNullOrWhiteSpace(texto))
         {
-            AtajoBajarZoom = "Ctrl+Alt+Down";
+            return "";
         }
+
+        return Atajo.TryParse(texto, out Atajo atajo) ? atajo.HaciaTexto() : "";
     }
 }
 

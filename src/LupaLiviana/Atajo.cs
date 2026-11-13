@@ -18,6 +18,78 @@ internal readonly record struct Atajo(uint Modificadores, Keys Tecla)
     /// <summary>Un atajo es válido solo si tiene al menos un modificador y una tecla.</summary>
     public bool EsValido => Modificadores != 0 && Tecla != Keys.None;
 
+    /// <summary>Atajo ausente u opcional deshabilitado.</summary>
+    public static Atajo Ninguno => default;
+
+    /// <summary>Texto canónico que se guarda en el JSON, por ejemplo "Ctrl+Alt+Up".</summary>
+    public string HaciaTexto()
+    {
+        if (!EsValido)
+        {
+            return "";
+        }
+
+        var partes = new List<string>(5);
+        AgregarModificadores(partes);
+        partes.Add(Tecla.ToString());
+        return string.Join("+", partes);
+    }
+
+    /// <summary>Texto para mostrar en la interfaz, por ejemplo "Ctrl + Alt + Flecha arriba".</summary>
+    public string NombreVisible
+    {
+        get
+        {
+            if (!EsValido)
+            {
+                return "Sin atajo";
+            }
+
+            var partes = new List<string>(5);
+            AgregarModificadores(partes);
+            partes.Add(Teclas.NombreVisible(Tecla));
+            return string.Join(" + ", partes);
+        }
+    }
+
+    private void AgregarModificadores(List<string> partes)
+    {
+        if ((Modificadores & MOD_CONTROL) != 0)
+        {
+            partes.Add("Ctrl");
+        }
+
+        if ((Modificadores & MOD_ALT) != 0)
+        {
+            partes.Add("Alt");
+        }
+
+        if ((Modificadores & MOD_SHIFT) != 0)
+        {
+            partes.Add("Shift");
+        }
+
+        if ((Modificadores & MOD_WIN) != 0)
+        {
+            partes.Add("Win");
+        }
+    }
+
+    /// <summary>
+    /// Lee un atajo que puede estar vacío (deshabilitado). Devuelve true si el
+    /// texto es válido o está vacío; false si tiene un error de formato.
+    /// </summary>
+    public static bool TryParseOpcional(string? texto, out Atajo atajo)
+    {
+        if (string.IsNullOrWhiteSpace(texto))
+        {
+            atajo = Ninguno;
+            return true;
+        }
+
+        return TryParse(texto, out atajo);
+    }
+
     /// <summary>Convierte un texto del estilo "Ctrl+Alt+Up" en un atajo.</summary>
     public static bool TryParse(string? texto, out Atajo atajo)
     {

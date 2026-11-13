@@ -24,6 +24,10 @@ public sealed class ConfigServiceTests : IDisposable
         Assert.Equal(250, config.UmbralToqueMs);
         Assert.Equal(NivelSuavizado.Bajo, config.Suavizado);
         Assert.Equal(FiltroColor.Ninguno, config.Filtro);
+        Assert.Equal("Ctrl+Alt+Up", config.AtajoSubirZoom);
+        Assert.Equal("Ctrl+Alt+Down", config.AtajoBajarZoom);
+        Assert.Equal("", config.AtajoActivar);
+        Assert.Equal("", config.AtajoSiguienteFiltro);
         Assert.True(config.Activado);
         Assert.True(File.Exists(servicio.RutaArchivo));
     }
@@ -39,6 +43,10 @@ public sealed class ConfigServiceTests : IDisposable
             UmbralToqueMs = 150,
             Suavizado = NivelSuavizado.Alto,
             Filtro = FiltroColor.AltoContraste,
+            AtajoSubirZoom = "Ctrl+Shift+F1",
+            AtajoBajarZoom = "Win+Down",
+            AtajoActivar = "Ctrl+Alt+F8",
+            AtajoSiguienteFiltro = "Ctrl+Alt+F7",
             IniciarConWindows = true,
             Activado = false,
         };
@@ -52,6 +60,10 @@ public sealed class ConfigServiceTests : IDisposable
         Assert.Equal(150, recuperada.UmbralToqueMs);
         Assert.Equal(NivelSuavizado.Alto, recuperada.Suavizado);
         Assert.Equal(FiltroColor.AltoContraste, recuperada.Filtro);
+        Assert.Equal("Ctrl+Shift+F1", recuperada.AtajoSubirZoom);
+        Assert.Equal("Win+Down", recuperada.AtajoBajarZoom);
+        Assert.Equal("Ctrl+Alt+F8", recuperada.AtajoActivar);
+        Assert.Equal("Ctrl+Alt+F7", recuperada.AtajoSiguienteFiltro);
         Assert.True(recuperada.IniciarConWindows);
         Assert.False(recuperada.Activado);
     }
@@ -79,7 +91,7 @@ public sealed class ConfigServiceTests : IDisposable
             UmbralToqueMs = -10,
             BotonZoom = "no existe",
             AtajoSubirZoom = "sin modificador",
-            AtajoBajarZoom = "",
+            AtajoBajarZoom = "sin modificador",
         };
 
         config.Normalizar();
@@ -89,6 +101,59 @@ public sealed class ConfigServiceTests : IDisposable
         Assert.Equal("F9", config.BotonZoom);
         Assert.Equal("Ctrl+Alt+Up", config.AtajoSubirZoom);
         Assert.Equal("Ctrl+Alt+Down", config.AtajoBajarZoom);
+    }
+
+    [Fact]
+    public void UnAtajoVacioQuedaDeshabilitado()
+    {
+        var config = new Config
+        {
+            AtajoSubirZoom = "",
+            AtajoBajarZoom = "   ",
+            AtajoActivar = "",
+            AtajoSiguienteFiltro = "",
+        };
+
+        config.Normalizar();
+
+        Assert.Equal("", config.AtajoSubirZoom);
+        Assert.Equal("", config.AtajoBajarZoom);
+        Assert.Equal("", config.AtajoActivar);
+        Assert.Equal("", config.AtajoSiguienteFiltro);
+    }
+
+    [Fact]
+    public void LosAtajosValidosSeGuardanEnFormaCanonica()
+    {
+        var config = new Config
+        {
+            AtajoSubirZoom = "ctrl+shift+f1",
+            AtajoBajarZoom = "ALT + Win + Down",
+            AtajoActivar = "control+alt+f8",
+            AtajoSiguienteFiltro = "Ctrl+Alt+F7",
+        };
+
+        config.Normalizar();
+
+        Assert.Equal("Ctrl+Shift+F1", config.AtajoSubirZoom);
+        Assert.Equal("Alt+Win+Down", config.AtajoBajarZoom);
+        Assert.Equal("Ctrl+Alt+F8", config.AtajoActivar);
+        Assert.Equal("Ctrl+Alt+F7", config.AtajoSiguienteFiltro);
+    }
+
+    [Fact]
+    public void LosAtajosOpcionalesInvalidosQuedanVacios()
+    {
+        var config = new Config
+        {
+            AtajoActivar = "F9",
+            AtajoSiguienteFiltro = "Ctrl+Alt",
+        };
+
+        config.Normalizar();
+
+        Assert.Equal("", config.AtajoActivar);
+        Assert.Equal("", config.AtajoSiguienteFiltro);
     }
 
     [Fact]

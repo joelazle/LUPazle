@@ -78,4 +78,45 @@ public sealed class BotonYAtajosTests
     {
         Assert.False(Atajo.TryParse(texto, out _));
     }
+
+    [Theory]
+    [InlineData("Ctrl+Alt+Up", 0x0002u | 0x0001u, System.Windows.Forms.Keys.Up)]
+    [InlineData("Ctrl+Shift+F1", 0x0002u | 0x0004u, System.Windows.Forms.Keys.F1)]
+    [InlineData("Alt+Win+Down", 0x0001u | 0x0008u, System.Windows.Forms.Keys.Down)]
+    [InlineData("Ctrl+Alt+Shift+Win+F12", 0x000Fu, System.Windows.Forms.Keys.F12)]
+    public void ElAtajoSeEscribeEnFormaCanonica(string texto, uint modificadores, System.Windows.Forms.Keys tecla)
+    {
+        var atajo = new Atajo(modificadores, tecla);
+
+        Assert.Equal(texto, atajo.HaciaTexto());
+        Assert.True(Atajo.TryParse(atajo.HaciaTexto(), out Atajo recuperado));
+        Assert.Equal(atajo, recuperado);
+    }
+
+    [Fact]
+    public void ElNombreVisibleDelAtajoEsEnEspanol()
+    {
+        var atajo = new Atajo(0x0002u | 0x0001u, System.Windows.Forms.Keys.Up);
+
+        Assert.Equal("Ctrl + Alt + Flecha arriba", atajo.NombreVisible);
+        Assert.Equal("Sin atajo", Atajo.Ninguno.NombreVisible);
+        Assert.Equal("", Atajo.Ninguno.HaciaTexto());
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void UnAtajoOpcionalVacioEsValidoYQuedaDeshabilitado(string texto)
+    {
+        Assert.True(Atajo.TryParseOpcional(texto, out Atajo atajo));
+        Assert.False(atajo.EsValido);
+        Assert.Equal(Atajo.Ninguno, atajo);
+    }
+
+    [Fact]
+    public void UnAtajoOpcionalConFormatoInvalidoSeRechaza()
+    {
+        Assert.False(Atajo.TryParseOpcional("F9", out _));
+        Assert.False(Atajo.TryParseOpcional("Ctrl+Alt", out _));
+    }
 }

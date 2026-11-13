@@ -15,6 +15,13 @@ internal static class NativeMethods
     // Índices de GetSystemMetrics.
     internal const int SM_CXSCREEN = 0;
     internal const int SM_CYSCREEN = 1;
+    internal const int SM_XVIRTUALSCREEN = 76;
+    internal const int SM_YVIRTUALSCREEN = 77;
+    internal const int SM_CXVIRTUALSCREEN = 78;
+    internal const int SM_CYVIRTUALSCREEN = 79;
+
+    /// <summary>Si el punto no cae en ningún monitor, se usa el más cercano.</summary>
+    internal const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
 
     // Códigos de tecla virtual.
     internal const int VK_LBUTTON = 0x01;
@@ -23,6 +30,17 @@ internal static class NativeMethods
     internal const int VK_XBUTTON1 = 0x05;
     internal const int VK_XBUTTON2 = 0x06;
     internal const int VK_ESCAPE = 0x1B;
+    internal const int VK_SHIFT = 0x10;
+    internal const int VK_CONTROL = 0x11;
+    internal const int VK_MENU = 0x12;
+    internal const int VK_LWIN = 0x5B;
+    internal const int VK_RWIN = 0x5C;
+    internal const int VK_LSHIFT = 0xA0;
+    internal const int VK_RSHIFT = 0xA1;
+    internal const int VK_LCONTROL = 0xA2;
+    internal const int VK_RCONTROL = 0xA3;
+    internal const int VK_LMENU = 0xA4;
+    internal const int VK_RMENU = 0xA5;
 
     // Modificadores de RegisterHotKey.
     internal const uint MOD_ALT = 0x0001;
@@ -38,6 +56,25 @@ internal static class NativeMethods
     {
         public int X;
         public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    /// <summary>Datos de un monitor que devuelve GetMonitorInfo.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct MONITORINFO
+    {
+        public int cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
     }
 
     /// <summary>
@@ -60,6 +97,13 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     internal static extern int GetSystemMetrics(int indice);
+
+    [DllImport("user32.dll")]
+    internal static extern IntPtr MonitorFromPoint(POINT punto, uint banderas);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO informacion);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

@@ -11,6 +11,28 @@ internal enum FiltroColor
     AltoContraste,
 }
 
+/// <summary>Orden y nombres de los filtros, compartidos por el menú y los atajos.</summary>
+internal static class Filtros
+{
+    /// <summary>Devuelve el filtro que sigue en el ciclo, volviendo al principio.</summary>
+    public static FiltroColor Siguiente(FiltroColor actual) => actual switch
+    {
+        FiltroColor.Ninguno => FiltroColor.Invertir,
+        FiltroColor.Invertir => FiltroColor.EscalaDeGrises,
+        FiltroColor.EscalaDeGrises => FiltroColor.AltoContraste,
+        _ => FiltroColor.Ninguno,
+    };
+
+    /// <summary>Nombre en español del filtro, para los avisos de la bandeja.</summary>
+    public static string NombreVisible(FiltroColor filtro) => filtro switch
+    {
+        FiltroColor.Invertir => "Invertir",
+        FiltroColor.EscalaDeGrises => "Escala de grises",
+        FiltroColor.AltoContraste => "Alto contraste",
+        _ => "Ninguno",
+    };
+}
+
 /// <summary>Intensidad del suavizado del seguimiento del mouse.</summary>
 internal enum NivelSuavizado
 {
@@ -23,8 +45,12 @@ internal enum NivelSuavizado
 /// Envoltorio de la API de lupa de Windows (magnification.dll) en modo
 /// pantalla completa.
 ///
-/// El zoom se aplica a todo el escritorio. El mouse se mapea solo: por eso
-/// NO se llama a MagSetInputTransform, tal como pide el diseño.
+/// El zoom se aplica a todo el escritorio virtual, incluidos los monitores
+/// secundarios. El mouse se mueve en coordenadas reales: la lupa amplía, pero
+/// no intercepta los clics.
+///
+/// No se llama a MagSetInputTransform: esa función requiere privilegios
+/// UIAccess (una aplicación firmada), así que el programa no la usa.
 /// </summary>
 internal sealed class MagnifierService
 {
@@ -35,6 +61,12 @@ internal sealed class MagnifierService
     private float _ultimoNivel = -1f;
     private int _ultimoDesplazamientoX = int.MinValue;
     private int _ultimoDesplazamientoY = int.MinValue;
+
+    // Centro de la vista fija. Se calcula una vez por sesión fija para que
+    // cambiar el nivel de zoom no mueva la vista a otro monitor.
+    private bool _centroFijoListo;
+    private float _centroFijoX;
+    private float _centroFijoY;
 
     /// <summary>
     /// Si una ejecución anterior terminó de forma anormal, la pantalla puede
@@ -119,10 +151,11 @@ internal sealed class MagnifierService
     }
 
     /// <summary>
-    /// Centra la vista ampliada en el cursor del mouse. Se llama desde el timer
-    /// de ~60 Hz. <paramref name="factorSuavizado"/> vale 1 para seguir el cursor
-    /// sin suavizado y se acerca a 0 cuanto más suave es el movimiento.
-    /// No reserva memoria en cada llamada.
+    /// Centra la vista ampliada en el cursor del mouse. El punto del cursor se
+    /// muestra en el centro del monitor donde está el cursor. Se llama desde
+    /// el timer de ~60 Hz. <paramref name="factorSuavizado"/> vale 1 para
+    /// seguir el cursor sin suavizado y se acerca a 0 cuanto más suave es el
+    /// movimiento. No reserva memoria en cada llamada.
     /// </summary>
     public void SeguirCursor(float nivel, float factorSuavizado)
     {
@@ -157,10 +190,18 @@ internal sealed class MagnifierService
             }
         }
 
-        Aplicar(nivel, _xSuave, _ySuave);
+        // El punto del cursor se muestra en el centro del monitor donde está el
+        // cursor. Con una sola pantalla coincide con el centro de siempre.
+        RectanguloPantalla monitor = EscritorioWindows.MonitorEn(cursor.X, cursor.Y);
+        _centroFijoListo = false;
+
+        Aplicar(nivel, _xSuave, _ySuave, monitor.CentroX, monitor.CentroY);
     }
 
-    /// <summary>Fija la vista ampliada en el centro de la pantalla principal.</summary>
+    /// <summary>
+    /// Fija la vista ampliada en el centro del monitor donde está el cursor.
+    /// Con una sola pantalla es el centro de la pantalla, como antes.
+    /// </summary>
     public void FijarCentro(float nivel)
     {
         if (!AsegurarInicializada())
@@ -170,9 +211,21 @@ internal sealed class MagnifierService
 
         _seguimientoIniciado = false;
 
-        int ancho = GetSystemMetrics(SM_CXSCREEN);
-        int alto = GetSystemMetrics(SM_CYSCREEN);
-        Aplicar(nivel, ancho / 2f, alto / 2f);
+        if (!_centroFijoListo)
+        {
+            // Se guarda el centro de esta sesión fija: al cambiar el nivel de
+            // zoom no se vuelve a consultar el mouse, así la vista no salta a
+            // otro monitor si el cursor se movió mientras tanto.
+            RectanguloPantalla monitor = GetCursorPos(out POINT cursor)
+                ? EscritorioWindows.MonitorEn(cursor.X, cursor.Y)
+                : EscritorioWindows.Principal();
+
+            _centroFijoX = monitor.CentroX;
+            _centroFijoY = monitor.CentroY;
+            _centroFijoListo = true;
+        }
+
+        Aplicar(nivel, _centroFijoX, _centroFijoY, _centroFijoX, _centroFijoY);
     }
 
     /// <summary>Vuelve el zoom a 1.0 y libera la API de lupa.</summary>
@@ -196,6 +249,7 @@ internal sealed class MagnifierService
         {
             _inicializada = false;
             _seguimientoIniciado = false;
+            _centroFijoListo = false;
             _ultimoNivel = -1f;
             _ultimoDesplazamientoX = int.MinValue;
             _ultimoDesplazamientoY = int.MinValue;
@@ -203,15 +257,16 @@ internal sealed class MagnifierService
     }
 
     /// <summary>
-    /// Convierte un punto de la pantalla (en píxeles físicos) en el
-    /// desplazamiento que espera MagSetFullscreenTransform y lo aplica.
+    /// Convierte el punto del escritorio que se quiere mostrar y la posición
+    /// de pantalla donde debe aparecer en el desplazamiento que espera
+    /// MagSetFullscreenTransform, y lo aplica.
     ///
-    /// Según la documentación, xOffset/yOffset son las coordenadas, en la
-    /// pantalla sin ampliar, del punto que se muestra en la esquina superior
-    /// izquierda. Para centrar el punto P hay que restarle la mitad del área
-    /// visible (ancho / nivel).
+    /// Según la documentación, xOffset/yOffset son las coordenadas, en el
+    /// escritorio sin ampliar, del punto que se muestra en la esquina superior
+    /// izquierda de la pantalla principal. El cálculo y los límites del
+    /// escritorio virtual están en <see cref="CalculoVista"/>.
     /// </summary>
-    private void Aplicar(float nivel, float centroX, float centroY)
+    private void Aplicar(float nivel, float centroX, float centroY, float pantallaX, float pantallaY)
     {
         if (!_inicializada)
         {
@@ -223,27 +278,14 @@ internal sealed class MagnifierService
             nivel = 1f;
         }
 
-        int ancho = GetSystemMetrics(SM_CXSCREEN);
-        int alto = GetSystemMetrics(SM_CYSCREEN);
-        if (ancho <= 0 || alto <= 0)
+        RectanguloPantalla escritorio = EscritorioWindows.Virtual();
+        if (!escritorio.EsValido)
         {
             return;
         }
 
-        double anchoVisible = ancho / (double)nivel;
-        double altoVisible = alto / (double)nivel;
-
-        double desplazamientoX = centroX - (anchoVisible / 2.0);
-        double desplazamientoY = centroY - (altoVisible / 2.0);
-
-        // Limitar a los bordes: nunca se muestra "fuera" de la pantalla.
-        double maximoX = Math.Max(0.0, ancho - anchoVisible);
-        double maximoY = Math.Max(0.0, alto - altoVisible);
-        desplazamientoX = Math.Clamp(desplazamientoX, 0.0, maximoX);
-        desplazamientoY = Math.Clamp(desplazamientoY, 0.0, maximoY);
-
-        int x = (int)Math.Round(desplazamientoX);
-        int y = (int)Math.Round(desplazamientoY);
+        (int x, int y) = CalculoVista.Desplazamiento(
+            nivel, centroX, centroY, pantallaX, pantallaY, escritorio);
 
         // Evitar llamadas redundantes a la API cuando nada cambió.
         if (Math.Abs(nivel - _ultimoNivel) < 0.0005f && x == _ultimoDesplazamientoX && y == _ultimoDesplazamientoY)

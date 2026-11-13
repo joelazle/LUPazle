@@ -1,15 +1,18 @@
 # Lupa Liviana
 
-Lupa de pantalla para Windows pensada para personas con visión reducida que juegan
-en **modo ventana sin bordes**. Es un programa mínimo que vive **solo en la bandeja
-del sistema**, sin ventana principal: se configura con el menú del ícono (click
-derecho o click izquierdo) y usa la API oficial de ampliación de Windows.
+Lupa de pantalla para Windows para personas con visión reducida. Amplía **todo el
+escritorio**, así que funciona igual en el navegador, el Explorador, el menú
+Inicio, cualquier programa y juegos en **modo ventana sin bordes**. Es un programa
+mínimo que vive **solo en la bandeja del sistema**, sin ventana principal: se
+configura con el menú del ícono (click derecho o click izquierdo) y usa la API
+oficial de ampliación de Windows.
 
 - Un único botón de zoom (tecla o botón lateral del mouse). Por defecto: **F9**.
 - Mantener el botón: el zoom sigue al mouse.
-- Tocar el botón: el zoom queda fijo en el centro de la pantalla.
+- Tocar el botón: el zoom queda fijo en el centro del monitor donde está el mouse.
 - Filtros de color para mejorar el contraste.
 - Atajos globales para subir y bajar el nivel de zoom.
+- **Todas las teclas se configuran desde el menú**, sin editar archivos.
 - Sin hooks, sin inyección de código y sin tocar otros procesos.
 
 ---
@@ -98,6 +101,7 @@ Click derecho (o click izquierdo) sobre el ícono abre el menú:
 - **Sensibilidad del toque**: 150, 250 o 400 ms.
 - **Suavizado**: sin suavizado, bajo o alto.
 - **Filtro de color**: ninguno, invertir, escala de grises o alto contraste.
+- **Configurar teclas…**: ventana para cambiar el botón de zoom y todos los atajos.
 - **Iniciar con Windows**: agrega o quita la entrada en `HKCU\...\Run`.
 - **Abrir archivo de configuración**: abre el JSON en el editor predeterminado.
 - **Salir**.
@@ -114,7 +118,7 @@ Hay un solo botón, y funciona como una palanca:
 |---|---|
 | Zoom apagado + presionar | El zoom se enciende **al instante** y sigue al mouse. |
 | Mantener presionado | El zoom sigue al cursor (con suavizado opcional). |
-| Soltar antes del umbral (toque corto) | El zoom **queda fijo en el centro** de la pantalla. |
+| Soltar antes del umbral (toque corto) | El zoom **queda fijo en el centro** del monitor donde está el mouse. |
 | Soltar después del umbral (mantenido) | El zoom se apaga. |
 | Estando fijo + presionar | El zoom se apaga en ese momento. |
 
@@ -122,9 +126,29 @@ En resumen: **mantener = seguir al mouse; tocar = dejar el zoom fijo al centro
 hasta volver a tocar**. Un toque corto deja la lupa "puesta", como una palanca;
 otro toque la saca.
 
-La tecla **no se bloquea ni se consume**: sigue llegando al juego normalmente.
-Por eso conviene elegir un botón que el juego no use (por ejemplo, F9 suele estar
-libre; Escape o la barra espaciadora casi nunca lo están).
+La tecla **no se bloquea ni se consume**: sigue llegando al programa que tenga el
+foco normalmente. Por eso conviene elegir un botón que ese programa no use (por
+ejemplo, F9 suele estar libre; Escape o la barra espaciadora casi nunca lo están).
+
+### Usar la lupa en Windows
+
+No hace falta estar en un juego: el zoom se aplica a **todo el escritorio** y el
+botón funciona en cualquier ventana, aunque el navegador o el Explorador tengan
+el foco.
+
+1. Mantené el botón de zoom y mové el mouse para recorrer la pantalla.
+2. Soltá el botón para volver a 1× y hacer clic donde quieras.
+3. Para dejar la vista fija mientras leés, tocá el botón; otro toque la apaga.
+
+> **Mientras el zoom está puesto, los clics siguen en coordenadas reales.** Es una
+> limitación de Windows: para que un clic llegue al elemento ampliado hay que usar
+> `MagSetInputTransform`, que exige privilegios UIAccess (una aplicación firmada).
+> Por eso conviene **mirar con el zoom y soltar antes de hacer clic**. El modo fijo
+> sirve para leer; tocá el botón para apagarlo antes de interactuar.
+
+En varios monitores, el centrado toma como referencia el monitor donde está el
+cursor y la vista puede pasar de una pantalla a otra sin recortarse (ver
+[Varios monitores](#varios-monitores)).
 
 ### Cambiar el botón
 
@@ -134,7 +158,36 @@ libre; Escape o la barra espaciadora casi nunca lo están).
 
 Se acepta cualquier tecla del teclado y los botones laterales `XButton1` y
 `XButton2`. Los botones izquierdo, derecho y central del mouse no se usan porque
-interrumpirían el uso normal del equipo.
+interrumpirían el uso normal del equipo. Si mantenés `Ctrl`, `Alt` o `Shift`
+mientras elegís la tecla, el modificador se ignora y se guarda solo la tecla
+(por ejemplo, `Ctrl+F9` deja `F9` como botón).
+
+### Configurar todas las teclas
+
+Menú del ícono → **Configurar teclas…** abre una ventana con el botón de zoom y
+los cuatro atajos globales:
+
+| Acción | Valor por defecto |
+|---|---|
+| Botón de zoom | `F9` |
+| Activar o desactivar Lupa Liviana | *(sin atajo)* |
+| Subir el nivel de zoom | `Ctrl+Alt+↑` |
+| Bajar el nivel de zoom | `Ctrl+Alt+↓` |
+| Siguiente filtro de color | *(sin atajo)* |
+
+Para cambiar uno: **Cambiar**, y después presioná la tecla o combinación.
+`Escape` cancela la captura; si no elegís nada en 10 segundos, se cancela sola.
+**Quitar** deja el atajo sin asignar. **Restablecer valores** carga los valores
+de fábrica. Nada se aplica hasta que apretás **Guardar**.
+
+Al guardar, el programa prueba cada combinación con el registro de atajos de
+Windows. Si otro programa ya la está usando, muestra el error y conserva la
+combinación anterior. Los atajos también se aplican a todo el sistema, incluso
+sobre el juego o el navegador, así que conviene elegir combinaciones que esos
+programas no usen.
+
+> El atajo de **activar o desactivar** queda registrado aunque la lupa esté
+> apagada: es la forma de volver a encenderla sin el mouse.
 
 ### Atajos globales de zoom
 
@@ -143,9 +196,35 @@ Mientras el programa está activo:
 - **Ctrl + Alt + Flecha arriba**: sube el nivel de zoom.
 - **Ctrl + Alt + Flecha abajo**: baja el nivel de zoom.
 
-Funcionan aunque el juego tenga el foco. Son opcionales: si otro programa ya los
-usa (por ejemplo, el atajo de rotar pantalla del controlador Intel), el programa
-avisa que no pudo registrarlos. Se pueden cambiar en el archivo de configuración.
+Funcionan aunque el juego o el navegador tengan el foco. Son opcionales: si otro
+programa ya los usa (por ejemplo, el atajo de rotar pantalla del controlador
+Intel), el programa avisa que no pudo registrarlos y se pueden cambiar desde
+**Configurar teclas…** o directamente en el archivo de configuración.
+
+También se pueden asignar estos dos atajos opcionales, que por defecto están
+vacíos (deshabilitados):
+
+- **Activar o desactivar Lupa Liviana**: hace lo mismo que el primer ítem del
+  menú. Sigue funcionando con la lupa apagada.
+- **Siguiente filtro de color**: pasa de `Ninguno` a `Invertir`, a
+  `Escala de grises`, a `Alto contraste` y vuelve a empezar. Se aplica al
+  instante si el zoom está encendido, y muestra el nombre del filtro en un globo.
+
+---
+
+## Varios monitores
+
+La lupa usa el **escritorio virtual completo**. El seguimiento y el centrado toman
+como referencia el monitor donde está el cursor, y la vista puede pasar de un
+monitor a otro sin recortarse en el borde de la pantalla principal.
+
+- Mantener el botón: el cursor se muestra en el centro del monitor donde está.
+- Tocar el botón: la vista fija se centra en ese mismo monitor.
+- Cambiar el nivel de zoom estando fijo no mueve la vista a otro monitor aunque
+  el mouse se haya movido.
+
+La API de Windows aplica un mismo nivel de zoom a todas las pantallas. Con un solo
+monitor el comportamiento es exactamente el mismo de siempre.
 
 ---
 
@@ -163,13 +242,6 @@ escritorio. Por eso:
 El programa no instala hooks ni inyecta código en otros procesos, así que no
 interfiere con sistemas antitrampas; aun así, ningún programa externo puede
 garantizar al 100 % que un antitrampas lo acepte.
-
-### Varios monitores
-
-La referencia es la **pantalla principal**. El seguimiento del mouse y el
-centrado usan sus dimensiones; en monitores secundarios el desplazamiento se
-limita al borde. Para jugar con la lupa, lo más simple es usar la pantalla
-principal.
 
 ---
 
@@ -192,6 +264,8 @@ Ejemplo con todos los campos:
   "filtro": "Ninguno",
   "atajoSubirZoom": "Ctrl+Alt+Up",
   "atajoBajarZoom": "Ctrl+Alt+Down",
+  "atajoActivar": "",
+  "atajoSiguienteFiltro": "",
   "iniciarConWindows": false,
   "activado": true
 }
@@ -205,8 +279,11 @@ Valores válidos:
 - `umbralToqueMs`: entre 80 y 2000.
 - `suavizado`: `"Ninguno"`, `"Bajo"` o `"Alto"`.
 - `filtro`: `"Ninguno"`, `"Invertir"`, `"EscalaDeGrises"` o `"AltoContraste"`.
-- `atajoSubirZoom` / `atajoBajarZoom`: modificadores (`Ctrl`, `Alt`, `Shift`, `Win`)
-  más una tecla, por ejemplo `"Ctrl+Alt+Up"` o `"Ctrl+Shift+F1"`.
+- `atajoSubirZoom` / `atajoBajarZoom` / `atajoActivar` / `atajoSiguienteFiltro`:
+  modificadores (`Ctrl`, `Alt`, `Shift`, `Win`) más una tecla, por ejemplo
+  `"Ctrl+Alt+Up"` o `"Ctrl+Shift+F1"`. Un texto vacío (`""`) deshabilita ese
+  atajo; en los dos atajos de nivel, un texto con formato inválido vuelve al
+  valor por defecto, y en los opcionales queda deshabilitado.
 - `iniciarConWindows`: `true` o `false`.
 - `activado`: `true` o `false`.
 
@@ -221,7 +298,9 @@ como `config.json.roto`.
 
 - **API de lupa**: `magnification.dll` (`MagInitialize`, `MagUninitialize`,
   `MagSetFullscreenTransform`, `MagGetFullscreenTransform`, `MagSetColorEffect`).
-  No se usa `MagSetInputTransform`: en modo pantalla completa el mouse se mapea solo.
+  No se usa `MagSetInputTransform`: requiere privilegios UIAccess (una aplicación
+  firmada), así que los clics se hacen en coordenadas reales. La lupa se usa para
+  mirar y se suelta antes de hacer clic.
 - **Botón de zoom**: se lee con `GetAsyncKeyState` desde un temporizador de la
   interfaz. Windows cuantiza los temporizadores a ~15,6 ms, por lo que se usa un
   intervalo de 10 ms y se obtienen ~60 lecturas por segundo. La repetición
@@ -230,7 +309,10 @@ como `config.json.roto`.
   inyecta nada en otros procesos.
 - **Seguimiento del mouse**: `GetCursorPos` en el mismo temporizador, con
   interpolación opcional y sin reservar memoria en cada tick. El desplazamiento se
-  limita a los bordes de la pantalla.
+  limita a los bordes del escritorio virtual.
+- **Geometría de varios monitores**: `EscritorioWindows` consulta
+  `SM_*VIRTUALSCREEN`, `MonitorFromPoint` y `GetMonitorInfo`; `CalculoVista` hace
+  el cálculo puro del desplazamiento y se prueba con monitores simulados.
 - **DPI alto**: `app.manifest` declara `PerMonitorV2`; las coordenadas que se usan
   son píxeles físicos.
 - **Instancia única**: `Mutex` con nombre; si ya hay una instancia, avisa y se
@@ -254,19 +336,30 @@ src/LupaLiviana/
   Program.cs              Punto de entrada, instancia única y manejo de errores.
   TrayApp.cs              ApplicationContext: ícono, menú, timer y comandos.
   MagnifierService.cs     Envoltorio de la API de lupa y matrices de color.
+  VistaEscritorio.cs      Geometría del escritorio virtual y de cada monitor.
   ButtonStateMachine.cs   Lógica de mantener/tocar, sin acceso a Windows.
   ConfigService.cs        Modelo de configuración y lectura/escritura del JSON.
   NativeMethods.cs        Declaraciones P/Invoke.
   BotonZoom.cs            Botón de zoom (tecla o botón lateral) y su texto.
-  Atajo.cs                Atajos globales (RegisterHotKey).
+  Teclas.cs               Nombres de teclas y detección de modificadores.
+  Atajo.cs                Atajos globales: lectura, escritura y texto visible.
+  RegistroAtajos.cs       Altas y bajas de atajos, con vuelta atrás si falla.
+  CapturaTeclas.cs        Captura de la próxima tecla o combinación, sin hooks.
+  ConfigTeclas.cs         Conjunto de teclas configurable y sus validaciones.
+  FormularioTeclas.cs     Ventana "Configurar teclas".
   VentanaAtajos.cs        Ventana invisible que recibe WM_HOTKEY.
   IconoTray.cs            Generación de los íconos de la bandeja.
   app.manifest            DPI PerMonitorV2 y ejecución sin privilegios.
 tests/LupaLiviana.Tests/
   ButtonStateMachineTests.cs   Toque corto, mantenido, toque estando fijo,
                                repetición de tecla y umbral.
-  BotonYAtajosTests.cs         Lectura/escritura de botones y atajos.
+  BotonYAtajosTests.cs         Botones, atajos y su texto canónico.
   ConfigServiceTests.cs        Valores por defecto, ida y vuelta, archivo roto.
+  CapturaTeclasTests.cs        Combinaciones, Escape, timeout y modificadores.
+  RegistroAtajosTests.cs       Registro, liberación y vuelta atrás.
+  ConfigTeclasTests.cs         Valores por defecto, duplicados y advertencias.
+  FiltrosTests.cs              Ciclo y nombres de los filtros de color.
+  VistaEscritorioTests.cs      Centrado y límites con uno y varios monitores.
 README.md
 ```
 
@@ -277,9 +370,23 @@ README.md
 - **El ícono no aparece**: puede estar en el área de íconos ocultos de la bandeja.
 - **El zoom no se ve sobre el juego**: el juego está en pantalla completa
   exclusiva; cambialo a ventana sin bordes.
+- **Mientras hay zoom, los clics caen en otro lugar**: es una limitación de
+  Windows. La lupa no puede reasignar los clics a la vista ampliada sin
+  privilegios UIAccess (aplicación firmada). Soltá el botón o tocá para apagar el
+  zoom antes de hacer clic.
+- **La vista no sigue al foco del teclado**: la lupa sigue al mouse, no al cursor
+  de texto. Si navegás con `Tab`, mové un poco el mouse para llevar la vista a la
+  zona nueva.
+- **En un monitor secundario la vista se recortaba**: el centrado ahora toma el
+  monitor donde está el cursor y los límites son los del escritorio completo.
 - **Los atajos Ctrl+Alt+Flechas no hacen nada**: otro programa los tiene tomados
-  (controladores de video, herramientas de accesibilidad). Se pueden cambiar en el
-  JSON.
+  (controladores de video, herramientas de accesibilidad) o el atajo quedó vacío.
+  Se pueden cambiar desde **Configurar teclas…** o en el JSON.
+- **Al guardar un atajo dice que no se pudo registrar**: otro programa ya usa esa
+  combinación. Probá con otra; el atajo anterior se conserva.
+- **El atajo incluye la tecla del botón de zoom**: la ventana avisa. Al usarlo se
+  va a mover la lupa además de la acción del atajo; conviene elegir otra
+  combinación.
 - **Cambié el JSON y no pasa nada**: los cambios se leen al iniciar; cerrá y volvé
   a abrir el programa.
 - **La pantalla quedó ampliada**: no debería pasar; el programa restaura el zoom en

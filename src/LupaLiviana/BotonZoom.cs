@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Windows.Forms;
 using static LupaLiviana.NativeMethods;
 
@@ -55,22 +54,7 @@ internal readonly record struct BotonZoom(Keys Tecla, BotonMouse Mouse)
                     : "Botón lateral 2 del mouse (adelante)";
             }
 
-            return Tecla switch
-            {
-                Keys.Up => "Flecha arriba",
-                Keys.Down => "Flecha abajo",
-                Keys.Left => "Flecha izquierda",
-                Keys.Right => "Flecha derecha",
-                Keys.Space => "Espacio",
-                Keys.Enter => "Enter",
-                Keys.Escape => "Escape",
-                Keys.Tab => "Tab",
-                Keys.Back => "Retroceso",
-                Keys.Oemtilde => "Ñ / ~",
-                >= Keys.D0 and <= Keys.D9 => ((char)('0' + ((int)Tecla - (int)Keys.D0))).ToString(CultureInfo.InvariantCulture),
-                >= Keys.NumPad0 and <= Keys.NumPad9 => "Num " + ((int)Tecla - (int)Keys.NumPad0).ToString(CultureInfo.InvariantCulture),
-                _ => Tecla.ToString(),
-            };
+            return Teclas.NombreVisible(Tecla);
         }
     }
 

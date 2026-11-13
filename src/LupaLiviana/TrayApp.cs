@@ -18,10 +18,10 @@ internal sealed class TrayApp : ApplicationContext
     // Windows cuantiza los temporizadores de ventana a ~15,6 ms, así que un
     // intervalo de 10 ms termina dando unos 60 Hz reales (verificado).
     private const int IntervaloTimerMs = 10;
-    private const int IdAtajoSubir = 1;
-    private const int IdAtajoBajar = 2;
-    private const int EsperaAntesDeCapturarMs = 350;
-    private const int DuracionMaximaCapturaMs = 10_000;
+    private const int IdAtajoActivar = 1;
+    private const int IdAtajoSubir = 2;
+    private const int IdAtajoBajar = 3;
+    private const int IdAtajoSiguienteFiltro = 4;
     private const int LargoMaximoTextoIcono = 63;
     private const string ClaveRun = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string NombreRun = "LupaLiviana";
@@ -33,6 +33,8 @@ internal sealed class TrayApp : ApplicationContext
     private readonly MagnifierService _lupa = new();
     private readonly ButtonStateMachine _maquina = new();
     private readonly VentanaAtajos _ventanaAtajos;
+    private readonly RegistroAtajos _registroAtajos;
+    private readonly CapturaTeclas _captura = new();
     private readonly Icon _iconoNormal;
     private readonly Icon _iconoActivo;
     private readonly NotifyIcon _iconoTray;
@@ -50,26 +52,23 @@ internal sealed class TrayApp : ApplicationContext
 
     private Config _config;
     private BotonZoom _boton;
+    private Atajo _atajoActivar;
     private Atajo _atajoSubir;
     private Atajo _atajoBajar;
+    private Atajo _atajoSiguienteFiltro;
+    private FormularioTeclas? _ventanaTeclas;
 
-    private bool _atajosActivos;
-    private bool _atajoSubirRegistrado;
-    private bool _atajoBajarRegistrado;
     private bool _avisoFalloLupa;
     private bool _limpiado;
-
-    // Estado del modo "capturar el próximo botón".
-    private bool _capturando;
-    private long _capturaInicioMs;
-    private bool[] _teclasAntes = [];
 
     public TrayApp()
     {
         _config = _configService.Cargar();
         _boton = BotonZoom.TryParse(_config.BotonZoom, out BotonZoom botonLeido) ? botonLeido : BotonZoom.PorDefecto;
-        _atajoSubir = Atajo.TryParse(_config.AtajoSubirZoom, out Atajo subir) ? subir : Atajo.DefectoSubir;
-        _atajoBajar = Atajo.TryParse(_config.AtajoBajarZoom, out Atajo bajar) ? bajar : Atajo.DefectoBajar;
+        _atajoActivar = LeerAtajoOpcional(_config.AtajoActivar);
+        _atajoSubir = LeerAtajoOpcional(_config.AtajoSubirZoom);
+        _atajoBajar = LeerAtajoOpcional(_config.AtajoBajarZoom);
+        _atajoSiguienteFiltro = LeerAtajoOpcional(_config.AtajoSiguienteFiltro);
 
         _iconoNormal = IconoTray.Crear(false);
         _iconoActivo = IconoTray.Crear(true);
@@ -88,6 +87,9 @@ internal sealed class TrayApp : ApplicationContext
 
         _ventanaAtajos = new VentanaAtajos();
         _ventanaAtajos.AtajoPresionado += AlAtajoGlobal;
+        _registroAtajos = new RegistroAtajos(
+            (identificador, modificadores, tecla) => _ventanaAtajos.Registrar(identificador, modificadores, tecla),
+            identificador => _ventanaAtajos.Liberar(identificador));
 
         _timer = new System.Windows.Forms.Timer { Interval = IntervaloTimerMs };
         _timer.Tick += AlTick;
@@ -104,6 +106,7 @@ internal sealed class TrayApp : ApplicationContext
         else
         {
             ActualizarIcono();
+            AplicarRegistroAtajos();
         }
     }
 
@@ -155,6 +158,8 @@ internal sealed class TrayApp : ApplicationContext
         _subMenuFiltro.DropDownItems.Add(CrearOpcion("Escala de grises", FiltroColor.EscalaDeGrises, CambiarFiltro));
         _subMenuFiltro.DropDownItems.Add(CrearOpcion("Alto contraste", FiltroColor.AltoContraste, CambiarFiltro));
         _menu.Items.Add(_subMenuFiltro);
+
+        _menu.Items.Add(CrearOpcion("Configurar teclas…", true, _ => AbrirConfiguracionTeclas()));
 
         _menu.Items.Add(new ToolStripSeparator());
 
@@ -225,17 +230,17 @@ internal sealed class TrayApp : ApplicationContext
         _avisoFalloLupa = false;
 
         _timer.Start();
-        RegistrarAtajos();
+        AplicarRegistroAtajos();
         ActualizarIcono();
     }
 
     private void DesactivarPrograma()
     {
         _config.Activado = false;
-        _capturando = false;
+        _captura.Cancelar();
         _maquina.Reiniciar();
         _timer.Stop();
-        DesregistrarAtajos();
+        AplicarRegistroAtajos();
 
         _lupa.Apagar();
         ActualizarIcono();
@@ -323,7 +328,7 @@ internal sealed class TrayApp : ApplicationContext
     }
 
     // ------------------------------------------------------------------
-    // Captura del nuevo botón
+    // Captura del nuevo botón (desde el menú)
     // ------------------------------------------------------------------
 
     private void IniciarCaptura()
@@ -334,9 +339,10 @@ internal sealed class TrayApp : ApplicationContext
             return;
         }
 
-        if (_capturando)
+        if (_captura.Activa)
         {
-            _capturando = false;
+            _captura.Cancelar();
+            Avisar("No se cambió el botón de zoom.");
             return;
         }
 
@@ -345,13 +351,7 @@ internal sealed class TrayApp : ApplicationContext
         _maquina.Reiniciar();
         ActualizarIcono();
 
-        _capturando = true;
-        _capturaInicioMs = Environment.TickCount64;
-        _teclasAntes = new bool[256];
-        for (int vk = 0; vk < _teclasAntes.Length; vk++)
-        {
-            _teclasAntes[vk] = EstaPresionada(vk);
-        }
+        _captura.Iniciar(ModoCaptura.Boton, EstaPresionada, Environment.TickCount64);
 
         Avisar(
             "Presioná la tecla (o el botón lateral del mouse) que querés usar como botón de zoom." +
@@ -361,70 +361,24 @@ internal sealed class TrayApp : ApplicationContext
 
     private void ProcesarCaptura()
     {
-        long transcurrido = Environment.TickCount64 - _capturaInicioMs;
+        ResultadoCaptura resultado = _captura.Procesar(Environment.TickCount64);
 
-        // Se ignora el primer instante para no capturar el click del menú.
-        if (transcurrido < EsperaAntesDeCapturarMs)
+        if (resultado.Estado == EstadoCaptura.Cancelada)
+        {
+            Avisar(resultado.Mensaje);
+            return;
+        }
+
+        if (resultado.Estado != EstadoCaptura.CambioDetectado || resultado.Boton is not BotonZoom boton)
         {
             return;
         }
 
-        if (transcurrido > DuracionMaximaCapturaMs)
-        {
-            TerminarCaptura(null);
-            return;
-        }
-
-        if (EstaPresionada(VK_XBUTTON1) && !_teclasAntes[VK_XBUTTON1])
-        {
-            TerminarCaptura(new BotonZoom(Keys.None, BotonMouse.XButton1));
-            return;
-        }
-
-        if (EstaPresionada(VK_XBUTTON2) && !_teclasAntes[VK_XBUTTON2])
-        {
-            TerminarCaptura(new BotonZoom(Keys.None, BotonMouse.XButton2));
-            return;
-        }
-
-        for (int vk = 8; vk < _teclasAntes.Length; vk++)
-        {
-            if (vk is VK_LBUTTON or VK_RBUTTON or VK_MBUTTON or VK_XBUTTON1 or VK_XBUTTON2)
-            {
-                continue;
-            }
-
-            if (!EstaPresionada(vk) || _teclasAntes[vk])
-            {
-                continue;
-            }
-
-            if (vk == VK_ESCAPE)
-            {
-                TerminarCaptura(null);
-                return;
-            }
-
-            TerminarCaptura(new BotonZoom((Keys)vk, BotonMouse.Ninguno));
-            return;
-        }
-    }
-
-    private void TerminarCaptura(BotonZoom? boton)
-    {
-        _capturando = false;
-
-        if (boton is null)
-        {
-            Avisar("No se cambió el botón de zoom.");
-            return;
-        }
-
-        _boton = boton.Value;
-        _config.BotonZoom = _boton.Id;
+        _boton = boton;
+        _config.BotonZoom = boton.Id;
         GuardarConfig();
         _maquina.Reiniciar();
-        Avisar($"Botón de zoom: {_boton.NombreVisible}");
+        Avisar($"Botón de zoom: {boton.NombreVisible}");
     }
 
     // ------------------------------------------------------------------
@@ -433,7 +387,7 @@ internal sealed class TrayApp : ApplicationContext
 
     private void AlTick(object? remitente, EventArgs e)
     {
-        if (_capturando)
+        if (_captura.Activa)
         {
             ProcesarCaptura();
             return;
@@ -506,62 +460,183 @@ internal sealed class TrayApp : ApplicationContext
     // Atajos globales
     // ------------------------------------------------------------------
 
-    private void RegistrarAtajos()
+    private static Atajo LeerAtajoOpcional(string texto)
     {
-        if (_atajosActivos)
-        {
-            return;
-        }
-
-        _atajosActivos = true;
-        _atajoSubirRegistrado = _ventanaAtajos.Registrar(
-            IdAtajoSubir, _atajoSubir.Modificadores, (uint)_atajoSubir.Tecla);
-        _atajoBajarRegistrado = _ventanaAtajos.Registrar(
-            IdAtajoBajar, _atajoBajar.Modificadores, (uint)_atajoBajar.Tecla);
-
-        if (!_atajoSubirRegistrado || !_atajoBajarRegistrado)
-        {
-            Avisar("No se pudo registrar uno de los atajos de zoom. Puede que otro programa ya los esté usando.");
-        }
+        return Atajo.TryParse(texto, out Atajo atajo) ? atajo : Atajo.Ninguno;
     }
 
-    private void DesregistrarAtajos()
+    private Dictionary<int, Atajo> AtajosDeseados()
     {
-        if (!_atajosActivos)
+        var teclas = new ConfigTeclas(
+            _boton,
+            _atajoActivar,
+            _atajoSubir,
+            _atajoBajar,
+            _atajoSiguienteFiltro);
+
+        return ConstruirAtajos(teclas, _config.Activado);
+    }
+
+    private static Dictionary<int, Atajo> ConstruirAtajos(ConfigTeclas teclas, bool activado)
+    {
+        var deseados = new Dictionary<int, Atajo>(4);
+
+        // El atajo de activar/desactivar queda registrado siempre: si no, no
+        // habría forma de volver a encender la lupa sin el mouse.
+        if (teclas.Activar.EsValido)
         {
-            return;
+            deseados[IdAtajoActivar] = teclas.Activar;
         }
 
-        if (_atajoSubirRegistrado)
+        if (activado)
         {
-            _ventanaAtajos.Liberar(IdAtajoSubir);
-            _atajoSubirRegistrado = false;
+            if (teclas.Subir.EsValido)
+            {
+                deseados[IdAtajoSubir] = teclas.Subir;
+            }
+
+            if (teclas.Bajar.EsValido)
+            {
+                deseados[IdAtajoBajar] = teclas.Bajar;
+            }
+
+            if (teclas.SiguienteFiltro.EsValido)
+            {
+                deseados[IdAtajoSiguienteFiltro] = teclas.SiguienteFiltro;
+            }
         }
 
-        if (_atajoBajarRegistrado)
-        {
-            _ventanaAtajos.Liberar(IdAtajoBajar);
-            _atajoBajarRegistrado = false;
-        }
+        return deseados;
+    }
 
-        _atajosActivos = false;
+    private void AplicarRegistroAtajos()
+    {
+        IReadOnlyList<int> fallidos = _registroAtajos.Aplicar(AtajosDeseados());
+        if (fallidos.Count > 0)
+        {
+            Avisar("No se pudo registrar uno de los atajos. Puede que otro programa ya los esté usando.");
+        }
     }
 
     private void AlAtajoGlobal(int identificador)
     {
+        if (identificador == IdAtajoActivar)
+        {
+            AlternarActivacion();
+            Avisar(_config.Activado ? "Lupa Liviana activada." : "Lupa Liviana desactivada.");
+            return;
+        }
+
         if (!_config.Activado)
         {
             return;
         }
 
-        if (identificador == IdAtajoSubir)
+        switch (identificador)
         {
-            CambiarNivelPorPaso(1);
+            case IdAtajoSubir:
+                CambiarNivelPorPaso(1);
+                break;
+
+            case IdAtajoBajar:
+                CambiarNivelPorPaso(-1);
+                break;
+
+            case IdAtajoSiguienteFiltro:
+                CiclarFiltro();
+                break;
         }
-        else if (identificador == IdAtajoBajar)
+    }
+
+    private void CiclarFiltro()
+    {
+        CambiarFiltro(Filtros.Siguiente(_config.Filtro));
+        Avisar($"Filtro de color: {Filtros.NombreVisible(_config.Filtro)}");
+    }
+
+    // ------------------------------------------------------------------
+    // Ventana de configuración de teclas
+    // ------------------------------------------------------------------
+
+    private void AbrirConfiguracionTeclas()
+    {
+        if (_ventanaTeclas is { IsDisposed: false })
         {
-            CambiarNivelPorPaso(-1);
+            _ventanaTeclas.Activate();
+            return;
         }
+
+        // Mientras se configuran las teclas no debe haber zoom ni atajos activos:
+        // así probar una combinación no cambia el nivel ni dispara acciones.
+        _captura.Cancelar();
+        _lupa.Apagar();
+        _maquina.Reiniciar();
+        ActualizarIcono();
+        _timer.Stop();
+        _registroAtajos.LiberarTodo();
+
+        using var ventana = new FormularioTeclas(ConfigTeclas.Desde(_config), AplicarTeclasDesdeVentana);
+        _ventanaTeclas = ventana;
+
+        try
+        {
+            if (ventana.ShowDialog() == DialogResult.OK)
+            {
+                Avisar("Teclas guardadas.");
+            }
+        }
+        finally
+        {
+            _ventanaTeclas = null;
+            AplicarRegistroAtajos();
+
+            if (_config.Activado)
+            {
+                _timer.Start();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Valida y aplica los valores elegidos en la ventana. Devuelve un mensaje
+    /// de error (la ventana sigue abierta) o null si se aplicaron.
+    /// </summary>
+    private string? AplicarTeclasDesdeVentana(ConfigTeclas nuevas)
+    {
+        string? error = nuevas.Validar();
+        if (error is not null)
+        {
+            return error;
+        }
+
+        Dictionary<int, Atajo> deseados = ConstruirAtajos(nuevas, _config.Activado);
+        IReadOnlyList<int> fallidos = _registroAtajos.Aplicar(deseados);
+
+        if (fallidos.Count > 0)
+        {
+            // Se vuelve a registrar el conjunto anterior, que quedó libre al abrir la ventana.
+            _registroAtajos.Aplicar(AtajosDeseados());
+
+            string nombres = string.Join(
+                ", ",
+                fallidos.Select(identificador => deseados.TryGetValue(identificador, out Atajo atajo)
+                    ? atajo.NombreVisible
+                    : $"atajo {identificador}"));
+
+            return $"No se pudo registrar {nombres}. Puede que otro programa ya esté usando esa combinación.";
+        }
+
+        nuevas.AplicarA(_config);
+        _boton = nuevas.Boton;
+        _atajoActivar = nuevas.Activar;
+        _atajoSubir = nuevas.Subir;
+        _atajoBajar = nuevas.Bajar;
+        _atajoSiguienteFiltro = nuevas.SiguienteFiltro;
+
+        GuardarConfig();
+        _maquina.Reiniciar();
+        ActualizarIcono();
+        return null;
     }
 
     // ------------------------------------------------------------------
@@ -737,7 +812,7 @@ internal sealed class TrayApp : ApplicationContext
             // El timer puede estar ya liberado.
         }
 
-        DesregistrarAtajos();
+        _registroAtajos.LiberarTodo();
 
         _ventanaAtajos.AtajoPresionado -= AlAtajoGlobal;
         _ventanaAtajos.Destruir();

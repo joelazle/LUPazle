@@ -17,7 +17,7 @@
     <FileVersion>1.0.0.0</FileVersion>
     <Product>Lupa Liviana</Product>
     <AssemblyTitle>Lupa Liviana</AssemblyTitle>
-    <Description>Lupa de pantalla liviana para Windows, pensada para juegos en modo ventana sin bordes.</Description>
+    <Description>Lupa de pantalla liviana para Windows: amplía todo el escritorio en juegos, navegador y cualquier programa.</Description>
     <NeutralLanguage>es</NeutralLanguage>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!-- WFAC010 pide configurar el DPI desde código, pero el diseño exige
