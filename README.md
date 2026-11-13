@@ -67,7 +67,7 @@ dotnet publish src\LupaLiviana\LupaLiviana.csproj -c Release -r win-x64 `
   -o publicacion
 ```
 
-Resultado: `publicacion\LupaLiviana.exe` (unos **180 KB**). Necesita el
+Resultado: `publicacion\LupaLiviana.exe` (unos **210 KB**). Necesita el
 .NET 8 Desktop Runtime instalado en la máquina.
 
 ### Opción 2: autocontenido (no requiere runtime)
