@@ -1,0 +1,16 @@
+# Normaliza los finales de línea en el repositorio y evita diffs falsos.
+* text=auto
+
+*.cs text diff=csharp
+*.csproj text
+*.sln text eol=crlf
+*.md text
+*.json text
+*.manifest text
+*.yml text
+*.yaml text
+
+*.exe binary
+*.dll binary
+*.png binary
+*.ico binary

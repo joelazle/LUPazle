@@ -1,0 +1,49 @@
+# Archivos generados por la compilación
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+
+# Publicaciones (los .exe van como assets del release, no al repositorio)
+publicacion/
+publicacion-autocontenido/
+dist/
+publish/
+
+# Visual Studio, Rider y VS Code
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+
+# Resultados de pruebas y cobertura
+TestResults/
+[Tt]est[Rr]esult*/
+coverage*.json
+coverage*.xml
+coverage*.info
+
+# Paquetes NuGet
+*.nupkg
+*.snupkg
+packages/
+
+# Archivos temporales y de respaldo
+*.pdb
+*.cache
+*.tmp
+*.log
+*.bak
+*.roto
+
+# Basura del sistema
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

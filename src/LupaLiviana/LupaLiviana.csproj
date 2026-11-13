@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>LupaLiviana</RootNamespace>
+    <AssemblyName>LupaLiviana</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationVisualStyles>true</ApplicationVisualStyles>
+    <ApplicationUseCompatibleTextRendering>false</ApplicationUseCompatibleTextRendering>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <Version>1.0.0</Version>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Product>Lupa Liviana</Product>
+    <AssemblyTitle>Lupa Liviana</AssemblyTitle>
+    <Description>Lupa de pantalla liviana para Windows, pensada para juegos en modo ventana sin bordes.</Description>
+    <NeutralLanguage>es</NeutralLanguage>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- WFAC010 pide configurar el DPI desde código, pero el diseño exige
+         declarar PerMonitorV2 en app.manifest, que es lo que aplica el sistema
+         operativo antes de que arranque .NET. Se silencia esa sugerencia. -->
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+    <DebugType>embedded</DebugType>
+    <PublishTrimmed>false</PublishTrimmed>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="LupaLiviana.Tests" />
+  </ItemGroup>
+
+</Project>
